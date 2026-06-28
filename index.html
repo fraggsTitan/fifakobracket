@@ -412,6 +412,54 @@
     transition: background 0.25s;
   }
 
+  /* ── SHARE MODAL ── */
+  .share-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.78); align-items: center; justify-content: center;
+    padding: 20px; backdrop-filter: blur(4px);
+  }
+  .share-overlay.open { display: flex; }
+  .share-modal {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 10px; overflow: hidden;
+    max-width: 580px; width: 100%; display: flex; flex-direction: column;
+    max-height: 90vh;
+  }
+  .share-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+    background: var(--pitch-light);
+  }
+  .share-modal-title {
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900;
+    font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--white);
+  }
+  .share-modal-title span { color: var(--gold); }
+  .share-close {
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    font-size: 22px; line-height: 1; padding: 2px 6px; border-radius: 4px; transition: color 0.15s;
+  }
+  .share-close:hover { color: var(--white); }
+  .share-preview {
+    overflow: auto; padding: 16px; background: var(--pitch);
+    flex: 1; display: flex; align-items: flex-start; justify-content: center; min-height: 120px;
+  }
+  .share-preview img { max-width: 100%; border-radius: 6px; border: 1px solid var(--line); display: block; }
+  .share-loading { padding: 52px 24px; text-align: center; color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .share-spinner {
+    width: 30px; height: 30px; border: 3px solid var(--line); border-top-color: var(--green-accent);
+    border-radius: 50%; margin: 0 auto 14px; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .share-actions {
+    padding: 12px 16px; border-top: 1px solid var(--line);
+    display: flex; gap: 10px; justify-content: flex-end; background: var(--pitch-mid);
+  }
+  .btn-green { background: var(--green-accent); color: #050e08; }
+  .btn-green:hover { filter: brightness(1.1); }
+
   /* ── TOAST ── */
   .toast {
     position: fixed; bottom: 24px; left: 50%;
@@ -522,6 +570,7 @@
       <div class="toggle-track"><div class="toggle-thumb"></div></div>
     </button>
     <button class="btn btn-ghost" onclick="resetBracket()">Reset</button>
+    <button class="btn btn-green" onclick="openShare()">📸 Share</button>
     <button class="btn btn-gold" onclick="saveBracket()">Save Picks</button>
   </div>
 </header>
@@ -614,8 +663,30 @@
   </div>
 </footer>
 
+
+<!-- ── SHARE MODAL ── -->
+<div class="share-overlay" id="shareOverlay" onclick="closeShareOnBg(event)">
+  <div class="share-modal">
+    <div class="share-modal-header">
+      <div class="share-modal-title">🏆 Share your <span>bracket</span></div>
+      <button class="share-close" onclick="closeShare()">✕</button>
+    </div>
+    <div class="share-preview" id="sharePreview">
+      <div class="share-loading" id="shareLoading">
+        <div class="share-spinner"></div>
+        Generating image…
+      </div>
+    </div>
+    <div class="share-actions">
+      <button class="btn btn-ghost" onclick="closeShare()">Close</button>
+      <button class="btn btn-green" id="shareDownloadBtn" onclick="downloadImage()" style="display:none;">⬇ Download PNG</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 // ── FLAGS ────────────────────────────────────────────────────────────────────
 const FLAGS = {
@@ -920,6 +991,118 @@ function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+
+// ── SHARE / SCREENSHOT ────────────────────────────────────────────────────────
+let shareImageUrl = null;
+
+function openShare() {
+  shareImageUrl = null;
+  const overlay = document.getElementById('shareOverlay');
+  const preview = document.getElementById('sharePreview');
+  const loading = document.getElementById('shareLoading');
+  const dlBtn   = document.getElementById('shareDownloadBtn');
+
+  // Reset state
+  preview.innerHTML = '';
+  const spinner = document.createElement('div');
+  spinner.className = 'share-loading';
+  spinner.id = 'shareLoading';
+  spinner.innerHTML = '<div class="share-spinner"></div>Generating image…';
+  preview.appendChild(spinner);
+  dlBtn.style.display = 'none';
+  overlay.classList.add('open');
+
+  // Build a self-contained snapshot element to capture
+  const bracketOuter = document.getElementById('bracketOuter');
+  const bracketRow   = document.getElementById('bracketWrap');
+
+  // We'll use html2canvas on a clone with a fixed dark background
+  const isLight = document.body.classList.contains('light');
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = [
+    'position:fixed', 'top:-99999px', 'left:-99999px',
+    'background:' + (isLight ? '#f0f4f0' : '#071510'),
+    'padding:32px',
+    'display:inline-flex',
+    'flex-direction:column',
+    'gap:12px',
+    'font-family:Barlow Condensed,sans-serif',
+  ].join(';');
+
+  // Title bar
+  const titleBar = document.createElement('div');
+  titleBar.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:4px;';
+  titleBar.innerHTML = `
+    <span style="font-size:28px">🏆</span>
+    <div>
+      <div style="font-family:Barlow Condensed,sans-serif;font-weight:900;font-size:22px;letter-spacing:0.05em;text-transform:uppercase;color:${isLight?'#1a2e1f':'#f0f4f0'}">
+        FIFA WORLD CUP <span style="color:${isLight?'#b8820a':'#f0b429'}">2026</span>
+      </div>
+      <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:${isLight?'#5a7a62':'#6b8c76'}">Bracket Predictor</div>
+    </div>`;
+
+  // Clone the bracket row (cards + picks, no SVG connectors)
+  const bracketClone = bracketRow.cloneNode(true);
+  bracketClone.style.cssText = 'display:flex;align-items:stretch;position:relative;';
+
+  // Watermark
+  const watermark = document.createElement('div');
+  watermark.style.cssText = `font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${isLight?'#5a7a62':'#6b8c76'};text-align:right;margin-top:4px;`;
+  watermark.textContent = 'worldcup2026bracket.app';
+
+  wrapper.appendChild(titleBar);
+  wrapper.appendChild(bracketClone);
+  wrapper.appendChild(watermark);
+  document.body.appendChild(wrapper);
+
+  // Short delay to let fonts/layout settle, then capture
+  setTimeout(() => {
+    html2canvas(wrapper, {
+      backgroundColor: isLight ? '#f0f4f0' : '#071510',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    }).then(canvas => {
+      document.body.removeChild(wrapper);
+      shareImageUrl = canvas.toDataURL('image/png');
+
+      const img = document.createElement('img');
+      img.src = shareImageUrl;
+      img.alt = 'Your World Cup 2026 bracket';
+
+      const loadingEl = document.getElementById('shareLoading');
+      if (loadingEl) loadingEl.remove();
+      preview.appendChild(img);
+      dlBtn.style.display = '';
+
+      // Try native share sheet (mobile) first, fall back to download
+      dlBtn.onclick = downloadImage;
+    }).catch(err => {
+      console.error(err);
+      document.body.removeChild(wrapper);
+      const loadingEl = document.getElementById('shareLoading');
+      if (loadingEl) loadingEl.textContent = 'Could not generate image. Try downloading directly.';
+    });
+  }, 120);
+}
+
+function downloadImage() {
+  if (!shareImageUrl) return;
+  const a = document.createElement('a');
+  a.href = shareImageUrl;
+  a.download = 'wc2026-bracket.png';
+  a.click();
+  showToast('Image downloaded ✓');
+}
+
+function closeShare() {
+  document.getElementById('shareOverlay').classList.remove('open');
+}
+function closeShareOnBg(e) {
+  if (e.target === document.getElementById('shareOverlay')) closeShare();
 }
 
 // ── RESIZE ────────────────────────────────────────────────────────────────────
