@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FIFA World Cup 2026 — Bracket Simulator</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap');
 
@@ -464,11 +465,11 @@
       display: flex; align-items: center; justify-content: center; white-space: nowrap;
     }
 
-    /* Progress bar: bar + % only */
-    .progress-bar-wrap { padding: 7px 14px; gap: 10px; }
+    /* Progress bar: bar only, centered, no label or % */
+    .progress-bar-wrap { padding: 8px 14px; gap: 0; justify-content: center; }
     .progress-label { display: none; }
-    .progress-track { height: 5px; }
-    .progress-pct { font-size: 11px; min-width: 28px; }
+    .progress-track { height: 5px; width: 100%; }
+    .progress-pct { display: none; }
 
     /* Round labels: hidden */
     .round-labels-row { display: none; }
@@ -479,7 +480,7 @@
 
     /* Footer: full-width single column, no overflow */
     footer {
-      padding: 24px 16px 20px;
+      padding: 24px 20px 24px;
       max-width: 100vw; box-sizing: border-box; overflow: hidden;
     }
     .footer-grid {
