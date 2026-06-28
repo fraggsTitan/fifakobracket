@@ -650,6 +650,10 @@
           <div class="footer-stat-label">Across USA, Canada, Mexico</div>
         </div>
       </div>
+      <div class="footer-stat">
+          <div class="footer-stat-val" id="counter">—</div>
+          <div class="footer-stat-label">👁 Visits today</div>
+        </div>
     </div>
   </div>
 
@@ -1224,6 +1228,19 @@ window.addEventListener('resize', () => {
 loadTheme();
 loadPicks();
 render();
+</script>
+<script>
+fetch("https://api.counterapi.dev/v1/fraggstitan/fifakobracket/up")
+  .then(res => res.json())
+  .then(data => {
+        const n = data.count;
+    document.getElementById("counter").innerHTML = n >= 1000
+      ? `${(n/1000).toFixed(1)} <span>k</span>`
+      : `${n} <span>today</span>`;
+  })
+  .catch(() => {
+    document.getElementById("counter").textContent = "N/A";
+  });
 </script>
 </body>
 </html>
