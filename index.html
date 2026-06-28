@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIFA World Cup 2026 — Bracket Simulator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap');
+  :root {
+    --pitch: #071510; --pitch-mid: #0d2218; --pitch-light: #143320;
+    --gold: #f0b429; --gold-dim: #a87a1a; --white: #f0f4f0;
+    --muted: #6b8c76; --line: #1e4030; --glow: rgba(240,180,41,0.18);
+    --green-accent: #34d378; --card-bg: #0f2a1d;
+    --card-border: #1e4030; --card-hover: #162e20;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--pitch); color: var(--white); font-family: 'Barlow', sans-serif; min-height: 100vh; overflow-x: auto; }
+
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: linear-gradient(180deg, #020d07 0%, rgba(2,13,7,0.96) 100%);
+    border-bottom: 1px solid var(--line); padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    backdrop-filter: blur(8px);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .trophy-icon { font-size: 28px; }
+  .header-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 22px; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.1; }
+  .header-title span { color: var(--gold); }
+  .header-sub { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .header-actions { display: flex; gap: 10px; }
+  .btn { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; border: none; cursor: pointer; padding: 8px 18px; border-radius: 4px; transition: all 0.15s; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .btn-ghost:hover { color: var(--white); border-color: var(--muted); }
+  .btn-gold { background: var(--gold); color: #050e08; }
+  .btn-gold:hover { background: #f5c53a; box-shadow: 0 0 14px var(--glow); }
+
+  .progress-bar-wrap { padding: 12px 32px; background: var(--pitch-mid); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 16px; }
+  .progress-label { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .progress-track { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--green-accent), var(--gold)); border-radius: 2px; transition: width 0.4s ease; }
+  .progress-pct { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; color: var(--green-accent); min-width: 36px; text-align: right; }
+
+  .bracket-wrap { padding: 32px; display: flex; gap: 0; min-width: max-content; align-items: stretch; }
+  .round-col { display: flex; flex-direction: column; justify-content: space-around; gap: 0; }
+  .match-slot { position: relative; display: flex; flex-direction: column; justify-content: center; }
+
+  .match-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 6px; overflow: hidden; width: 200px; transition: border-color 0.2s; }
+  .match-card:hover { border-color: var(--muted); }
+  .match-venue { background: var(--pitch-light); padding: 4px 10px; font-size: 9px; font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
+
+  .team-row { display: flex; align-items: center; padding: 7px 10px; cursor: pointer; gap: 8px; transition: background 0.15s; border-bottom: 1px solid var(--line); position: relative; }
+  .team-row:last-child { border-bottom: none; }
+  .team-row:hover { background: var(--card-hover); }
+  .team-row.selected { background: rgba(52,211,120,0.1); }
+  .team-row.selected::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--green-accent); border-radius: 3px 0 0 3px; }
+  .team-row.eliminated { opacity: 0.35; }
+  .team-row.tbd { cursor: default; }
+  .team-row.tbd:hover { background: transparent; }
+
+  .flag-wrap { width: 26px; height: 17px; flex-shrink: 0; border-radius: 2px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; }
+  .flag-wrap svg { width: 100%; height: 100%; display: block; }
+  .flag-placeholder { width: 26px; height: 17px; flex-shrink: 0; background: var(--line); border-radius: 2px; }
+
+  .team-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.02em; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team-row.selected .team-name { color: var(--green-accent); }
+  .team-row.tbd .team-name { color: var(--muted); font-style: italic; font-weight: 400; }
+  .pick-indicator { font-size: 11px; color: var(--green-accent); opacity: 0; transition: opacity 0.2s; }
+  .team-row.selected .pick-indicator { opacity: 1; }
+
+  .final-match { background: linear-gradient(135deg, #1a3a24, #0f2a1d); border: 1px solid var(--gold-dim); border-radius: 6px; overflow: hidden; width: 210px; box-shadow: 0 0 20px rgba(240,180,41,0.08); }
+  .final-match .match-venue { background: rgba(240,180,41,0.1); color: var(--gold); border-color: var(--gold-dim); }
+
+  .champion-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 0 40px; }
+  .champion-label { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); text-align: center; }
+  .champion-card { background: linear-gradient(135deg, #1a3a24, #0f2a1d); border: 2px solid var(--gold-dim); border-radius: 8px; width: 210px; text-align: center; overflow: hidden; box-shadow: 0 0 40px rgba(240,180,41,0.12); }
+  .champion-header { background: var(--gold); padding: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: #050e08; }
+  .champion-body { padding: 24px 16px; }
+  .champion-flag-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
+  .champion-flag-wrap .flag-wrap { width: 64px; height: 42px; border-radius: 4px; border: 2px solid var(--gold-dim); box-shadow: 0 0 16px rgba(240,180,41,0.2); }
+  .champion-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 22px; letter-spacing: 0.04em; color: var(--gold); min-height: 30px; }
+  .champion-name.empty { color: var(--muted); font-size: 13px; font-weight: 400; font-style: italic; }
+  .trophy-big { font-size: 30px; margin-top: 10px; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--green-accent); color: #050e08; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 24px; border-radius: 24px; transition: transform 0.3s cubic-bezier(.34,1.56,.64,1); z-index: 999; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  ::-webkit-scrollbar { height: 6px; width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--pitch); }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <div class="trophy-icon">🏆</div>
+    <div>
+      <div class="header-title">FIFA World Cup <span>2026</span></div>
+      <div class="header-sub">Bracket Predictor — Round of 32</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="resetBracket()">Reset</button>
+    <button class="btn btn-gold" onclick="saveBracket()">Save Picks</button>
+  </div>
+</header>
+<div class="progress-bar-wrap">
+  <div class="progress-label">Picks Complete</div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="progress-pct" id="progressPct">0%</div>
+</div>
+<div id="bracketWrap" class="bracket-wrap"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── INLINE SVG FLAGS ──────────────────────────────────────────────────────────
+// All flags are inline SVGs using viewBox="0 0 900 600" (standard 3:2)
+const FLAGS = {
+  'Germany': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 3"><rect width="5" height="3" y="0" fill="#000"/><rect width="5" height="2" y="1" fill="#D00"/><rect width="5" height="1" y="2" fill="#FFCE00"/></svg>`,
+  'Paraguay': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#D52B1E"/><rect width="900" height="400" y="100" fill="#fff"/><rect width="900" height="200" y="200" fill="#009F4D"/><circle cx="450" cy="300" r="70" fill="#fff"/><circle cx="450" cy="300" r="55" fill="#D52B1E"/><text x="450" y="315" text-anchor="middle" font-size="55" fill="#009F4D">★</text></svg>`,
+  'France': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="300" height="600" fill="#002395"/><rect width="300" height="600" x="300" fill="#fff"/><rect width="300" height="600" x="600" fill="#ED2939"/></svg>`,
+  'Sweden': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 10"><rect width="16" height="10" fill="#006AA7"/><rect width="16" height="2" y="4" fill="#FECC02"/><rect width="2" height="10" x="5" fill="#FECC02"/></svg>`,
+  'South Africa': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#007A4D"/><rect width="900" height="200" fill="#DE3831"/><rect width="900" height="200" y="400" fill="#002395"/><polygon points="0,0 0,600 320,300" fill="#000"/><polygon points="0,30 0,570 275,300" fill="#FFB612"/><polygon points="0,100 0,500 230,300" fill="#fff"/></svg>`,
+  'Canada': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><rect width="400" height="200" fill="#fff"/><rect width="100" height="200" fill="#FF0000"/><rect width="100" height="200" x="300" fill="#FF0000"/><polygon points="200,30 220,80 175,75 200,105 155,90 165,130 200,120 235,130 245,90 200,105 225,75 180,80" fill="#FF0000"/></svg>`,
+  'Netherlands': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="200" fill="#AE1C28"/><rect width="900" height="200" y="200" fill="#fff"/><rect width="900" height="200" y="400" fill="#21468B"/></svg>`,
+  'Morocco': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#C1272D"/><polygon points="450,200 480,300 575,300 500,355 525,455 450,400 375,455 400,355 325,300 420,300" fill="none" stroke="#006233" stroke-width="12"/></svg>`,
+  'Portugal': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="360" height="600" fill="#006600"/><rect width="540" height="600" x="360" fill="#FF0000"/><circle cx="360" cy="300" r="90" fill="#FFD700" opacity="0.9"/><circle cx="360" cy="300" r="70" fill="#003399"/><circle cx="360" cy="300" r="50" fill="#fff"/><text x="360" y="316" text-anchor="middle" font-size="40" fill="#003399">⚜</text></svg>`,
+  'Croatia': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="200" fill="#FF0000"/><rect width="900" height="200" y="200" fill="#fff"/><rect width="900" height="200" y="400" fill="#003DA5"/><rect width="120" height="120" x="390" y="120" fill="#fff"/><g transform="translate(390,120)" fill="none" stroke="#f00" stroke-width="0"><rect width="24" height="24" fill="#f00"/><rect width="24" height="24" x="24" fill="#fff"/><rect width="24" height="24" x="48" fill="#f00"/><rect width="24" height="24" x="72" fill="#fff"/><rect width="24" height="24" x="96" fill="#f00"/><rect width="24" height="24" y="24" fill="#fff"/><rect width="24" height="24" x="24" y="24" fill="#f00"/><rect width="24" height="24" x="48" y="24" fill="#fff"/><rect width="24" height="24" x="72" y="24" fill="#f00"/><rect width="24" height="24" x="96" y="24" fill="#fff"/><rect width="24" height="24" y="48" fill="#f00"/><rect width="24" height="24" x="24" y="48" fill="#fff"/><rect width="24" height="24" x="48" y="48" fill="#f00"/><rect width="24" height="24" x="72" y="48" fill="#fff"/><rect width="24" height="24" x="96" y="48" fill="#f00"/><rect width="24" height="24" y="72" fill="#fff"/><rect width="24" height="24" x="24" y="72" fill="#f00"/><rect width="24" height="24" x="48" y="72" fill="#fff"/><rect width="24" height="24" x="72" y="72" fill="#f00"/><rect width="24" height="24" x="96" y="72" fill="#fff"/><rect width="24" height="24" y="96" fill="#f00"/><rect width="24" height="24" x="24" y="96" fill="#fff"/><rect width="24" height="24" x="48" y="96" fill="#f00"/><rect width="24" height="24" x="72" y="96" fill="#fff"/><rect width="24" height="24" x="96" y="96" fill="#f00"/></g></svg>`,
+  'Spain': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#c60b1e"/><rect width="900" height="300" y="150" fill="#ffc400"/></svg>`,
+  'Austria': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="200" fill="#ED2939"/><rect width="900" height="200" y="200" fill="#fff"/><rect width="900" height="200" y="400" fill="#ED2939"/></svg>`,
+  'United States': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 100"><rect width="190" height="100" fill="#BF0A30"/><rect width="190" height="7.7" y="7.7" fill="#fff"/><rect width="190" height="7.7" y="23.1" fill="#fff"/><rect width="190" height="7.7" y="38.5" fill="#fff"/><rect width="190" height="7.7" y="53.9" fill="#fff"/><rect width="190" height="7.7" y="69.3" fill="#fff"/><rect width="190" height="7.7" y="84.7" fill="#fff"/><rect width="76" height="53.9" fill="#002868"/><text x="38" y="10" text-anchor="middle" fill="#fff" font-size="8">★ ★ ★ ★ ★ ★</text><text x="38" y="20" text-anchor="middle" fill="#fff" font-size="8">★ ★ ★ ★ ★</text><text x="38" y="30" text-anchor="middle" fill="#fff" font-size="8">★ ★ ★ ★ ★ ★</text><text x="38" y="40" text-anchor="middle" fill="#fff" font-size="8">★ ★ ★ ★ ★</text><text x="38" y="50" text-anchor="middle" fill="#fff" font-size="8">★ ★ ★ ★ ★ ★</text></svg>`,
+  'Bosnia/Herz.': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#002395"/><polygon points="0,600 600,0 600,600" fill="#FFCD00"/><g fill="#fff"><circle cx="80" cy="510" r="28"/><circle cx="180" cy="410" r="28"/><circle cx="280" cy="310" r="28"/><circle cx="380" cy="210" r="28"/><circle cx="480" cy="110" r="28"/><circle cx="580" cy="10" r="28"/></g></svg>`,
+  'Belgium': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="300" height="600" fill="#000"/><rect width="300" height="600" x="300" fill="#FAE042"/><rect width="300" height="600" x="600" fill="#EF3340"/></svg>`,
+  'Senegal': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="300" height="600" fill="#00853F"/><rect width="300" height="600" x="300" fill="#FDEF42"/><rect width="300" height="600" x="600" fill="#E31B23"/><polygon points="450,220 465,270 515,270 475,298 490,348 450,320 410,348 425,298 385,270 435,270" fill="#00853F"/></svg>`,
+  'Brazil': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#009c3b"/><polygon points="450,60 840,300 450,540 60,300" fill="#FEDD00"/><circle cx="450" cy="300" r="120" fill="#002776"/><path d="M330,260 Q450,320 570,260" stroke="#fff" stroke-width="14" fill="none"/><text x="450" y="310" text-anchor="middle" font-size="28" fill="#fff" font-weight="bold">BRASIL</text></svg>`,
+  'Japan': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#fff"/><circle cx="450" cy="300" r="180" fill="#BC002D"/></svg>`,
+  'Ivory Coast': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="300" height="600" fill="#F77F00"/><rect width="300" height="600" x="300" fill="#fff"/><rect width="300" height="600" x="600" fill="#009A44"/></svg>`,
+  'Norway': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 16"><rect width="22" height="16" fill="#EF2B2D"/><rect width="22" height="4" y="6" fill="#fff"/><rect width="4" height="16" x="6" fill="#fff"/><rect width="22" height="2" y="7" fill="#002868"/><rect width="2" height="16" x="7" fill="#002868"/></svg>`,
+  'Mexico': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="300" height="600" fill="#006847"/><rect width="300" height="600" x="300" fill="#fff"/><rect width="300" height="600" x="600" fill="#CE1126"/><circle cx="450" cy="300" r="70" fill="#fff"/><circle cx="450" cy="300" r="55" fill="#8B4513" opacity="0.3"/><text x="450" y="318" text-anchor="middle" font-size="60" fill="#4a7c3f">🦅</text></svg>`,
+  'Ecuador': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="300" fill="#FFD100"/><rect width="900" height="150" y="300" fill="#003399"/><rect width="900" height="150" y="450" fill="#FF0000"/></svg>`,
+  'England': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 36"><rect width="60" height="36" fill="#fff"/><rect width="60" height="8" y="14" fill="#CE1124"/><rect width="8" height="36" x="26" fill="#CE1124"/></svg>`,
+  'D.R. Congo': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#007FFF"/><rect width="1200" height="120" x="-150" y="240" fill="#F7D618" transform="rotate(-35,450,300)"/><circle cx="130" cy="90" r="70" fill="#CE1021"/><polygon points="130,30 148,85 205,85 160,118 176,173 130,140 84,173 100,118 55,85 112,85" fill="#F7D618"/></svg>`,
+  'Argentina': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="200" fill="#74ACDF"/><rect width="900" height="200" y="200" fill="#fff"/><rect width="900" height="200" y="400" fill="#74ACDF"/><circle cx="450" cy="300" r="60" fill="#F6B40E"/><circle cx="450" cy="300" r="40" fill="#F6B40E"/><g fill="#843511" transform="translate(450,300)"><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(0)"/><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(45)"/><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(90)"/><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(135)"/><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(180)"/><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(225)"/><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(270)"/><polygon points="0,-55 5,-20 18,-20 8,-5 12,15 0,5 -12,15 -8,-5 -18,-20 -5,-20" transform="rotate(315)"/></g></svg>`,
+  'Cape Verde': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#003893"/><rect width="900" height="60" y="360" fill="#fff"/><rect width="900" height="30" y="420" fill="#CF2027"/><rect width="900" height="60" y="450" fill="#fff"/><circle cx="300" cy="360" r="90" fill="none"/><g transform="translate(300,330)" fill="#F7D116"><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(0) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(36) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(72) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(108) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(144) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(180) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(216) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(252) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(288) translate(0,-60)"/><polygon points="0,-30 5,-10 20,-10 8,2 12,18 0,8 -12,18 -8,2 -20,-10 -5,-10" transform="rotate(324) translate(0,-60)"/></g></svg>`,
+  'Australia': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450"><rect width="900" height="450" fill="#00008B"/><rect width="450" height="225" fill="#00008B"/><rect width="450" height="45" y="90" fill="#fff"/><rect width="450" height="45" y="90" fill="#CC0000" style="margin:0 auto"/><rect width="90" height="225" x="180" fill="#fff"/><rect width="54" height="225" x="198" fill="#CC0000"/><rect width="450" height="27" y="99" fill="#CC0000"/><line x1="0" y1="0" x2="450" y2="225" stroke="#fff" stroke-width="30"/><line x1="450" y1="0" x2="0" y2="225" stroke="#fff" stroke-width="30"/><line x1="0" y1="0" x2="450" y2="225" stroke="#CC0000" stroke-width="18"/><line x1="450" y1="0" x2="0" y2="225" stroke="#CC0000" stroke-width="18"/><g fill="#fff" transform="translate(580,280)"><polygon points="0,-40 5,-14 22,-14 9,2 14,20 0,8 -14,20 -9,2 -22,-14 -5,-14"/></g><g fill="#fff" transform="translate(750,160)"><polygon points="0,-30 4,-10 16,-10 7,2 10,15 0,6 -10,15 -7,2 -16,-10 -4,-10"/></g><g fill="#fff" transform="translate(700,340)"><polygon points="0,-30 4,-10 16,-10 7,2 10,15 0,6 -10,15 -7,2 -16,-10 -4,-10"/></g><g fill="#fff" transform="translate(820,260)"><polygon points="0,-30 4,-10 16,-10 7,2 10,15 0,6 -10,15 -7,2 -16,-10 -4,-10"/></g><g fill="#fff" transform="translate(660,200)"><polygon points="0,-20 3,-7 11,-7 5,1 7,10 0,4 -7,10 -5,1 -11,-7 -3,-7"/></g></svg>`,
+  'Egypt': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="200" fill="#CE1126"/><rect width="900" height="200" y="200" fill="#fff"/><rect width="900" height="200" y="400" fill="#000"/><text x="450" y="330" text-anchor="middle" font-size="120" fill="#C09300">🦅</text></svg>`,
+  'Switzerland': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#FF0000"/><rect width="6" height="20" x="13" y="6" fill="#fff"/><rect width="20" height="6" x="6" y="13" fill="#fff"/></svg>`,
+  'Algeria': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="450" height="600" fill="#006233"/><rect width="450" height="600" x="450" fill="#fff"/><circle cx="480" cy="300" r="120" fill="#D21034"/><circle cx="510" cy="300" r="120" fill="#fff"/><polygon points="540,230 555,278 605,278 565,308 580,356 540,326 500,356 515,308 475,278 525,278" fill="#D21034"/></svg>`,
+  'Colombia': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="300" fill="#FCD116"/><rect width="900" height="150" y="300" fill="#003087"/><rect width="900" height="150" y="450" fill="#CE1126"/></svg>`,
+  'Ghana': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="200" fill="#006B3F"/><rect width="900" height="200" y="200" fill="#FCD116"/><rect width="900" height="200" y="400" fill="#CE1126"/><polygon points="450,240 465,290 518,290 475,320 491,370 450,340 409,370 425,320 382,290 435,290" fill="#000"/></svg>`,
+};
+
+function flagSvgHtml(name) {
+  const svg = FLAGS[name];
+  if (!svg) return `<span class="flag-placeholder"></span>`;
+  return `<span class="flag-wrap">${svg}</span>`;
+}
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const ROUNDS_DATA = [
+  { id:'r32', label:'Round of 32', matches:[
+    {id:'m1',  venue:'Boston · Jun 29',       teams:[{name:'Germany'      },{name:'Paraguay'    }]},
+    {id:'m2',  venue:'New York · Jun 30',      teams:[{name:'France'       },{name:'Sweden'      }]},
+    {id:'m3',  venue:'Los Angeles · Jun 28',   teams:[{name:'South Africa' },{name:'Canada'      }]},
+    {id:'m4',  venue:'Monterrey · Jun 29',     teams:[{name:'Netherlands'  },{name:'Morocco'     }]},
+    {id:'m5',  venue:'Toronto · Jul 2',        teams:[{name:'Portugal'     },{name:'Croatia'     }]},
+    {id:'m6',  venue:'Los Angeles · Jul 2',    teams:[{name:'Spain'        },{name:'Austria'     }]},
+    {id:'m7',  venue:'San Francisco · Jul 1',  teams:[{name:'United States'},{name:'Bosnia/Herz.'}]},
+    {id:'m8',  venue:'Seattle · Jul 1',        teams:[{name:'Belgium'      },{name:'Senegal'     }]},
+    {id:'m9',  venue:'Houston · Jun 29',       teams:[{name:'Brazil'       },{name:'Japan'       }]},
+    {id:'m10', venue:'Dallas · Jun 30',        teams:[{name:'Ivory Coast'  },{name:'Norway'      }]},
+    {id:'m11', venue:'Mexico City · Jun 30',   teams:[{name:'Mexico'       },{name:'Ecuador'     }]},
+    {id:'m12', venue:'Atlanta · Jul 1',        teams:[{name:'England'      },{name:'D.R. Congo'  }]},
+    {id:'m13', venue:'Miami · Jul 3',          teams:[{name:'Argentina'    },{name:'Cape Verde'  }]},
+    {id:'m14', venue:'Dallas · Jul 3',         teams:[{name:'Australia'    },{name:'Egypt'       }]},
+    {id:'m15', venue:'Vancouver · Jul 2',      teams:[{name:'Switzerland'  },{name:'Algeria'     }]},
+    {id:'m16', venue:'Kansas City · Jul 3',    teams:[{name:'Colombia'     },{name:'Ghana'       }]},
+  ]},
+  { id:'r16', label:'Round of 16', matches:[
+    {id:'r16m1',venue:'Philadelphia · Jul 4', feeds:['m1','m2'],   teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'r16m2',venue:'Houston · Jul 4',      feeds:['m3','m4'],   teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'r16m3',venue:'Dallas · Jul 6',       feeds:['m5','m6'],   teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'r16m4',venue:'Seattle · Jul 6',      feeds:['m7','m8'],   teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'r16m5',venue:'New York · Jul 5',     feeds:['m9','m10'],  teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'r16m6',venue:'Mexico City · Jul 5',  feeds:['m11','m12'], teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'r16m7',venue:'Atlanta · Jul 7',      feeds:['m13','m14'], teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'r16m8',venue:'Vancouver · Jul 7',    feeds:['m15','m16'], teams:[{name:'TBD'},{name:'TBD'}]},
+  ]},
+  { id:'qf', label:'Quarterfinals', matches:[
+    {id:'qfm1',venue:'Boston · Jul 9',         feeds:['r16m1','r16m2'],teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'qfm2',venue:'Los Angeles · Jul 10',   feeds:['r16m3','r16m4'],teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'qfm3',venue:'Miami · Jul 11',         feeds:['r16m5','r16m6'],teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'qfm4',venue:'Kansas City · Jul 11',   feeds:['r16m7','r16m8'],teams:[{name:'TBD'},{name:'TBD'}]},
+  ]},
+  { id:'sf', label:'Semifinals', matches:[
+    {id:'sfm1',venue:'Dallas · Jul 15',        feeds:['qfm1','qfm2'],teams:[{name:'TBD'},{name:'TBD'}]},
+    {id:'sfm2',venue:'Atlanta · Jul 16',       feeds:['qfm3','qfm4'],teams:[{name:'TBD'},{name:'TBD'}]},
+  ]},
+  { id:'final', label:'Final', matches:[
+    {id:'finalm',venue:'MetLife Stadium · Jul 19',feeds:['sfm1','sfm2'],teams:[{name:'TBD'},{name:'TBD'}]},
+  ]},
+];
+
+let picks = {};
+function loadPicks(){try{const s=localStorage.getItem('wc2026_bracket');if(s)picks=JSON.parse(s);}catch(e){picks={};}}
+function savePicks(){localStorage.setItem('wc2026_bracket',JSON.stringify(picks));}
+
+const matchIndex={};
+ROUNDS_DATA.forEach(r=>r.matches.forEach(m=>{matchIndex[m.id]=m;}));
+
+function resolveTeams(matchId){
+  const m=matchIndex[matchId];
+  if(!m.feeds)return m.teams.map(t=>({...t}));
+  return m.feeds.map(feedId=>getWinner(feedId)||{name:'TBD'});
+}
+function getWinner(matchId){
+  const pick=picks[matchId];
+  if(pick===undefined)return null;
+  const teams=resolveTeams(matchId);
+  return teams[pick]&&teams[pick].name!=='TBD'?teams[pick]:null;
+}
+function pickTeam(matchId,teamIdx){
+  const teams=resolveTeams(matchId);
+  if(teams[teamIdx].name==='TBD')return;
+  if(picks[matchId]!==undefined&&picks[matchId]!==teamIdx)clearDownstream(matchId);
+  picks[matchId]=teamIdx;
+  savePicks();
+  render();
+}
+function clearDownstream(matchId){
+  ROUNDS_DATA.forEach(r=>r.matches.forEach(m=>{
+    if(m.feeds&&m.feeds.includes(matchId)&&picks[m.id]!==undefined){
+      delete picks[m.id];clearDownstream(m.id);
+    }
+  }));
+}
+
+function render(){
+  const wrap=document.getElementById('bracketWrap');
+  const colW=210, colGap=36, UNIT=88;
+  const matchUnits=[1,2,4,8,16];
+  let html='';
+
+  ROUNDS_DATA.forEach((round,ri)=>{
+    const slotH=matchUnits[ri]*UNIT;
+    html+=`<div class="round-col" style="width:${colW}px;margin-right:${colGap}px;">`;
+    round.matches.forEach(m=>{
+      const teams=resolveTeams(m.id);
+      const pickedIdx=picks[m.id];
+      const isLast=ri===ROUNDS_DATA.length-1;
+      const cardClass=isLast?'final-match':'match-card';
+      html+=`<div class="match-slot" style="height:${slotH}px;display:flex;align-items:center;justify-content:center;">`;
+      html+=`<div class="${cardClass}"><div class="match-venue">${m.venue}</div>`;
+      teams.forEach((team,ti)=>{
+        const isTBD=team.name==='TBD';
+        const isPicked=pickedIdx===ti;
+        const isElim=pickedIdx!==undefined&&pickedIdx!==ti&&!isTBD;
+        let cls='team-row';
+        if(isTBD)cls+=' tbd';
+        else if(isPicked)cls+=' selected';
+        else if(isElim)cls+=' eliminated';
+        const onclick=isTBD?'':`onclick="pickTeam('${m.id}',${ti})"`;
+        const flagHtml=isTBD?`<span class="flag-placeholder"></span>`:flagSvgHtml(team.name);
+        html+=`<div class="${cls}" ${onclick}>${flagHtml}<span class="team-name">${team.name}</span><span class="pick-indicator">✓</span></div>`;
+      });
+      html+=`</div></div>`;
+    });
+    html+=`</div>`;
+  });
+
+  // Champion
+  const champion=getWinner('finalm');
+  html+=`<div class="champion-col"><div class="champion-label">🏆 World Champion</div><div class="champion-card"><div class="champion-header">FIFA World Cup 2026</div><div class="champion-body">`;
+  if(champion){
+    html+=`<div class="champion-flag-wrap">${flagSvgHtml(champion.name)}</div>`;
+    html+=`<div class="champion-name">${champion.name}</div><div class="trophy-big">🏆</div>`;
+  }else{
+    html+=`<div style="font-size:40px;opacity:0.15;margin-bottom:10px;">🏆</div><div class="champion-name empty">Complete your bracket</div>`;
+  }
+  html+=`</div></div></div>`;
+  wrap.innerHTML=html;
+
+  let done=0;
+  ROUNDS_DATA.forEach(r=>r.matches.forEach(m=>{
+    const t=resolveTeams(m.id);
+    if(!t.some(x=>x.name==='TBD')&&picks[m.id]!==undefined)done++;
+  }));
+  const pct=Math.round((done/31)*100);
+  document.getElementById('progressFill').style.width=pct+'%';
+  document.getElementById('progressPct').textContent=pct+'%';
+}
+
+function saveBracket(){savePicks();showToast('Bracket saved! ✓');}
+function resetBracket(){
+  if(!confirm('Reset all your picks? This cannot be undone.'))return;
+  picks={};savePicks();render();showToast('Bracket reset');
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+loadPicks();render();
+</script>
+</body>
+</html>
